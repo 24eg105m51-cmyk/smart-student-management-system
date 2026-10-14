@@ -8,62 +8,40 @@ function StudentDashboard() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let active = true;
+
     const loadDashboard = async () => {
       try {
         setError("");
-
-        // --------------------------------------------------
-        // Get logged-in student's dashboard automatically
-        // --------------------------------------------------
-
-        const dashboardResponse = await api.get(
-          "/dashboard/student/me"
-        );
-
+        const dashboardResponse = await api.get("/dashboard/student/me");
         const studentDashboard = dashboardResponse.data;
-
-        // --------------------------------------------------
-        // Get courses assigned to the logged-in student
-        // --------------------------------------------------
-
         const coursesResponse = await api.get(
           `/enrollments/student/${studentDashboard.studentId}`
         );
 
-        // --------------------------------------------------
-        // Combine dashboard + courses
-        // --------------------------------------------------
-
-        setDashboard({
-          ...studentDashboard,
-          courses: coursesResponse.data,
-        });
-
+        if (active) {
+          setDashboard({
+            ...studentDashboard,
+            courses: Array.isArray(coursesResponse.data)
+              ? coursesResponse.data
+              : [],
+          });
+        }
       } catch (err) {
-        console.error(
-          "Student dashboard error:",
-          err
-        );
+        console.error("Student dashboard error:", err);
+
+        if (!active) return;
 
         if (err.response) {
-          console.error(
-            "Backend response:",
-            err.response.data
-          );
-
           if (err.response.status === 401) {
-            setError(
-              "Your login session has expired. Please login again."
-            );
+            setError("Your login session has expired. Please log in again.");
           } else if (err.response.status === 403) {
-            setError(
-              "You do not have permission to access the student dashboard."
-            );
+            setError("You do not have permission to access the student dashboard.");
           } else {
             setError(
               typeof err.response.data === "string"
                 ? err.response.data
-                : "Unable to load student dashboard"
+                : "Unable to load the student dashboard. Please try again."
             );
           }
         } else {
@@ -75,472 +53,214 @@ function StudentDashboard() {
     };
 
     loadDashboard();
+    return () => {
+      active = false;
+    };
   }, []);
-
-  // --------------------------------------------------
-  // Error
-  // --------------------------------------------------
 
   if (error) {
     return (
-      <div className="student-dashboard-message">
-        <h2>{error}</h2>
+      <div className="student-layout">
+        <Sidebar />
+        <main className="student-main">
+          <div className="student-state-card student-error-state">
+            <div className="student-state-icon" aria-hidden="true">!</div>
+            <h1>Dashboard unavailable</h1>
+            <p>{error}</p>
+            <button className="student-primary-button" onClick={() => window.location.reload()}>
+              Try again
+            </button>
+          </div>
+        </main>
       </div>
     );
   }
-
-  // --------------------------------------------------
-  // Loading
-  // --------------------------------------------------
 
   if (!dashboard) {
     return (
-      <div className="student-dashboard-message">
-        <h2>
-          Loading Student Dashboard...
-        </h2>
+      <div className="student-layout">
+        <Sidebar />
+        <main className="student-main">
+          <div className="student-state-card" role="status">
+            <span className="student-spinner" aria-hidden="true" />
+            <h1>Preparing your dashboard</h1>
+            <p>Loading your profile, attendance, marks and courses…</p>
+          </div>
+        </main>
       </div>
     );
   }
 
-  // --------------------------------------------------
-  // Calculations
-  // --------------------------------------------------
-
-  const attendancePercentage =
-    Number(
-      dashboard.attendancePercentage || 0
-    ).toFixed(1);
-
-  const marksPercentage =
-    Number(
-      dashboard.overallMarksPercentage || 0
-    ).toFixed(1);
-
-  // --------------------------------------------------
-  // UI
-  // --------------------------------------------------
+  const attendanceValue = Number(dashboard.attendancePercentage || 0);
+  const marksValue = Number(dashboard.overallMarksPercentage || 0);
+  const attendancePercentage = Math.max(0, Math.min(100, attendanceValue));
+  const marksPercentage = Math.max(0, Math.min(100, marksValue));
+  const totalClasses = Number(dashboard.totalClasses || 0);
+  const presentClasses = Number(dashboard.presentClasses || 0);
+  const marks = Array.isArray(dashboard.marks) ? dashboard.marks : [];
+  const courses = Array.isArray(dashboard.courses) ? dashboard.courses : [];
+  const firstName = String(dashboard.name || "Student").trim().split(/\s+/)[0];
+  const avatarLetter = String(dashboard.name || "S").trim().charAt(0).toUpperCase();
 
   return (
     <div className="student-layout">
-
       <Sidebar />
 
       <main className="student-main">
-
-        {/* Header */}
-
-        <div className="student-header">
+        <header className="student-header">
           <div>
+            <div className="student-eyebrow">STUDENT PORTAL</div>
             <h1>Student Dashboard</h1>
-
-            <p>
-              Welcome, {dashboard.name}
-            </p>
+            <p>Here’s your academic overview at a glance.</p>
           </div>
+          <div className="student-header-date">
+            <span className="student-header-dot" />
+            <span>Academic overview</span>
+          </div>
+        </header>
+
+        <section className="student-welcome-banner" aria-label="Welcome">
+          <div className="student-welcome-copy">
+            <span className="student-welcome-kicker">YOUR LEARNING JOURNEY</span>
+            <h2>Welcome back, {firstName} <span aria-hidden="true">👋</span></h2>
+            <p>Keep up the good work. Track your attendance, review your marks and stay on top of your courses.</p>
+            <div className="student-welcome-tags">
+              <span>{dashboard.department || "Department not set"}</span>
+              <span>{dashboard.year || "Year not set"}</span>
+            </div>
+          </div>
+          <div className="student-welcome-art" aria-hidden="true">
+            <div className="student-art-circle student-art-circle-one" />
+            <div className="student-art-circle student-art-circle-two" />
+            <div className="student-art-book">▤</div>
+            <div className="student-art-spark student-art-spark-one">✦</div>
+            <div className="student-art-spark student-art-spark-two">✧</div>
+          </div>
+        </section>
+
+        <section className="student-stats-grid" aria-label="Academic statistics">
+          <article className="student-stat-card stat-blue">
+            <div className="student-stat-top"><span>Total Classes</span><span className="student-stat-icon">▦</span></div>
+            <strong>{totalClasses}</strong>
+            <small>Classes recorded</small>
+            <div className="student-stat-accent" />
+          </article>
+          <article className="student-stat-card stat-green">
+            <div className="student-stat-top"><span>Present Classes</span><span className="student-stat-icon">✓</span></div>
+            <strong>{presentClasses}</strong>
+            <small>Classes attended</small>
+            <div className="student-stat-accent" />
+          </article>
+          <article className="student-stat-card stat-violet">
+            <div className="student-stat-top"><span>Attendance</span><span className="student-stat-icon">◷</span></div>
+            <strong>{attendancePercentage.toFixed(1)}<small className="student-stat-percent">%</small></strong>
+            <small>Overall attendance</small>
+            <div className="student-stat-accent" />
+          </article>
+          <article className="student-stat-card stat-orange">
+            <div className="student-stat-top"><span>Marks Percentage</span><span className="student-stat-icon">✎</span></div>
+            <strong>{marksPercentage.toFixed(1)}<small className="student-stat-percent">%</small></strong>
+            <small>Overall marks</small>
+            <div className="student-stat-accent" />
+          </article>
+        </section>
+
+        <div className="student-overview-grid">
+          <section className="student-panel student-profile-panel">
+            <div className="student-panel-heading">
+              <div><span className="student-panel-kicker">ACCOUNT</span><h2>Profile details</h2></div>
+              <span className="student-panel-symbol">♙</span>
+            </div>
+            <div className="student-profile-summary">
+              <div className="student-avatar">{avatarLetter || "S"}</div>
+              <div className="student-profile-title">
+                <h3>{dashboard.name || "Student"}</h3>
+                <p>{dashboard.email || "Email not available"}</p>
+                <span className="student-profile-status"><i /> Student account</span>
+              </div>
+            </div>
+            <div className="student-profile-fields">
+              <div><span>Phone number</span><strong>{dashboard.phone || "Not available"}</strong></div>
+              <div><span>Department</span><strong>{dashboard.department || "Not available"}</strong></div>
+              <div><span>Academic year</span><strong>{dashboard.year || "Not available"}</strong></div>
+              <div><span>Email address</span><strong className="student-break-word">{dashboard.email || "Not available"}</strong></div>
+            </div>
+          </section>
+
+          <section className="student-panel student-attendance-panel">
+            <div className="student-panel-heading">
+              <div><span className="student-panel-kicker">CONSISTENCY</span><h2>Attendance overview</h2></div>
+              <span className="student-panel-symbol attendance-symbol">◷</span>
+            </div>
+            <div className="student-attendance-content">
+              <div className="student-attendance-ring" style={{ "--attendance-value": `${attendancePercentage}%` }} role="img" aria-label={`Attendance ${attendancePercentage.toFixed(1)} percent`}>
+                <div className="student-attendance-ring-inner"><strong>{attendancePercentage.toFixed(1)}%</strong><span>Attendance</span></div>
+              </div>
+              <div className="student-attendance-note">
+                <strong>{attendancePercentage >= 75 ? "Keep it up!" : "Attendance needs attention"}</strong>
+                <p>{attendancePercentage >= 75 ? "Stay consistent with your classes to maintain your progress." : "Try to attend upcoming classes regularly to improve your percentage."}</p>
+              </div>
+            </div>
+            <div className="student-attendance-metrics">
+              <div><span><i className="attendance-dot dot-present" />Present</span><strong>{presentClasses}</strong></div>
+              <div><span><i className="attendance-dot dot-total" />Total classes</span><strong>{totalClasses}</strong></div>
+            </div>
+          </section>
         </div>
 
-        {/* Profile */}
-
-        <div className="student-profile-card">
-
-          <div className="student-avatar">
-            {dashboard.name
-              ? dashboard.name
-                  .charAt(0)
-                  .toUpperCase()
-              : "S"}
+        <section className="student-panel student-marks-overview-panel">
+          <div className="student-panel-heading">
+            <div><span className="student-panel-kicker">PERFORMANCE</span><h2>Marks overview</h2></div>
+            <span className="student-panel-symbol marks-symbol">✎</span>
           </div>
-
-          <div className="student-profile-info">
-
-            <h2>
-              {dashboard.name}
-            </h2>
-
-            <p>
-              {dashboard.email}
-            </p>
-
-            <span>
-              {dashboard.department} •{" "}
-              {dashboard.year}
-            </span>
-
+          <div className="student-marks-summary-grid">
+            <div className="student-marks-summary-item"><span>Total marks obtained</span><strong>{Number(dashboard.totalMarks || 0)}</strong><small>Across recorded exams</small></div>
+            <div className="student-marks-summary-item"><span>Maximum marks</span><strong>{Number(dashboard.totalMaxMarks || 0)}</strong><small>Available marks</small></div>
+            <div className="student-marks-summary-item student-marks-summary-highlight"><span>Overall percentage</span><strong>{marksPercentage.toFixed(1)}%</strong><div className="student-progress-track"><span style={{ width: `${marksPercentage}%` }} /></div></div>
           </div>
+        </section>
 
-        </div>
-
-        {/* Statistics */}
-
-        <div className="student-dashboard-cards">
-
-          <div className="student-card">
-            <span>Total Classes</span>
-
-            <strong>
-              {dashboard.totalClasses || 0}
-            </strong>
+        <section className="student-panel student-table-panel">
+          <div className="student-panel-heading student-table-heading">
+            <div><span className="student-panel-kicker">ASSESSMENTS</span><h2>My marks</h2><p>Review your exam results and percentages.</p></div>
+            <span className="student-count-pill">{marks.length} {marks.length === 1 ? "exam" : "exams"}</span>
           </div>
-
-          <div className="student-card">
-            <span>Present Classes</span>
-
-            <strong>
-              {dashboard.presentClasses || 0}
-            </strong>
-          </div>
-
-          <div className="student-card">
-            <span>Attendance</span>
-
-            <strong>
-              {attendancePercentage}%
-            </strong>
-          </div>
-
-          <div className="student-card">
-            <span>Marks Percentage</span>
-
-            <strong>
-              {marksPercentage}%
-            </strong>
-          </div>
-
-        </div>
-
-        {/* Main Content */}
-
-        <div className="student-content-grid">
-
-          {/* Profile Details */}
-
-          <div className="student-section">
-
-            <h2>Profile Details</h2>
-
-            <div className="profile-details">
-
-              <div>
-                <span>Name</span>
-
-                <strong>
-                  {dashboard.name}
-                </strong>
-              </div>
-
-              <div>
-                <span>Email</span>
-
-                <strong>
-                  {dashboard.email}
-                </strong>
-              </div>
-
-              <div>
-                <span>Phone</span>
-
-                <strong>
-                  {dashboard.phone ||
-                    "Not available"}
-                </strong>
-              </div>
-
-              <div>
-                <span>Department</span>
-
-                <strong>
-                  {dashboard.department}
-                </strong>
-              </div>
-
-              <div>
-                <span>Year</span>
-
-                <strong>
-                  {dashboard.year}
-                </strong>
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* Attendance */}
-
-          <div className="student-section">
-
-            <h2>Attendance Overview</h2>
-
-            <div className="attendance-overview">
-
-              <div className="attendance-number">
-                {attendancePercentage}%
-              </div>
-
-              <p>
-                Attendance Percentage
-              </p>
-
-              <div className="attendance-details">
-
-                <div>
-                  <span>
-                    Total Classes
-                  </span>
-
-                  <strong>
-                    {dashboard.totalClasses ||
-                      0}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>Present</span>
-
-                  <strong>
-                    {dashboard.presentClasses ||
-                      0}
-                  </strong>
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* Marks Overview */}
-
-        <div className="student-section full-width">
-
-          <h2>Marks Overview</h2>
-
-          <div className="marks-overview">
-
-            <div className="marks-stat">
-              <span>Total Marks</span>
-
-              <strong>
-                {dashboard.totalMarks || 0}
-              </strong>
-            </div>
-
-            <div className="marks-stat">
-              <span>Maximum Marks</span>
-
-              <strong>
-                {dashboard.totalMaxMarks || 0}
-              </strong>
-            </div>
-
-            <div className="marks-stat">
-              <span>
-                Overall Percentage
-              </span>
-
-              <strong>
-                {marksPercentage}%
-              </strong>
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* Individual Marks */}
-
-        <div className="student-section full-width">
-
-          <div className="section-heading">
-
-            <div>
-              <h2>My Marks</h2>
-
-              <span>
-                Total:{" "}
-                {dashboard.marks?.length || 0}
-              </span>
-            </div>
-
-          </div>
-
-          <div className="student-marks-table-container">
-
-            <table className="student-marks-table">
-
-              <thead>
-                <tr>
-                  <th>Exam</th>
-                  <th>Marks</th>
-                  <th>Total</th>
-                  <th>Percentage</th>
-                </tr>
-              </thead>
-
+          <div className="student-table-scroll">
+            <table className="student-data-table">
+              <thead><tr><th>Exam</th><th>Marks obtained</th><th>Maximum marks</th><th>Percentage</th></tr></thead>
               <tbody>
-
-                {dashboard.marks?.length > 0 ? (
-
-                  dashboard.marks.map(
-                    (mark) => {
-
-                      const obtained =
-                        Number(
-                          mark.marksObtained ??
-                            mark.marks ??
-                            0
-                        );
-
-                      const total =
-                        Number(
-                          mark.totalMarks ??
-                            mark.maxMarks ??
-                            0
-                        );
-
-                      const percentage =
-                        total > 0
-                          ? (
-                              (obtained /
-                                total) *
-                              100
-                            ).toFixed(1)
-                          : "0.0";
-
-                      return (
-                        <tr
-                          key={mark.id}
-                        >
-
-                          <td>
-                            {mark.examType ||
-                              "Not specified"}
-                          </td>
-
-                          <td>
-                            {obtained}
-                          </td>
-
-                          <td>
-                            {total}
-                          </td>
-
-                          <td>
-                            <span className="student-percentage-badge">
-                              {percentage}%
-                            </span>
-                          </td>
-
-                        </tr>
-                      );
-                    }
-                  )
-
-                ) : (
-
-                  <tr>
-                    <td
-                      colSpan="4"
-                      className="empty-state"
-                    >
-                      No marks available.
-                    </td>
-                  </tr>
-
-                )}
-
+                {marks.length > 0 ? marks.map((mark, index) => {
+                  const obtained = Number(mark.marksObtained ?? mark.marks ?? 0);
+                  const total = Number(mark.totalMarks ?? mark.maxMarks ?? 0);
+                  const percentage = total > 0 ? (obtained / total) * 100 : 0;
+                  return <tr key={mark.id ?? `${mark.examType || "exam"}-${index}`}>
+                    <td><span className="student-exam-mark">{String(mark.examType || "Exam").charAt(0).toUpperCase()}</span><strong>{mark.examType || "Not specified"}</strong></td>
+                    <td>{obtained}</td><td>{total}</td>
+                    <td><span className={`student-result-badge ${percentage >= 75 ? "result-good" : percentage >= 40 ? "result-average" : "result-low"}`}>{percentage.toFixed(1)}%</span></td>
+                  </tr>;
+                }) : <tr><td colSpan="4" className="student-empty-table">No marks available yet.</td></tr>}
               </tbody>
-
             </table>
-
           </div>
+        </section>
 
-        </div>
-
-        {/* Courses */}
-
-        <div className="student-section full-width">
-
-          <div className="section-heading">
-
-            <div>
-              <h2>My Courses</h2>
-
-              <span>
-                Total:{" "}
-                {dashboard.courses?.length ||
-                  0}
-              </span>
-            </div>
-
+        <section className="student-panel student-courses-panel">
+          <div className="student-panel-heading student-table-heading">
+            <div><span className="student-panel-kicker">YOUR STUDIES</span><h2>My courses</h2><p>Courses associated with your student account.</p></div>
+            <span className="student-count-pill">{courses.length} {courses.length === 1 ? "course" : "courses"}</span>
           </div>
+          {courses.length > 0 ? <div className="student-course-grid">
+            {courses.map((course, index) => <article className="student-course-card" key={course.id ?? `${course.courseCode || "course"}-${index}`}>
+              <div className="student-course-card-top"><span className="student-course-icon">▤</span><span className="student-course-label">COURSE {String(index + 1).padStart(2, "0")}</span></div>
+              <h3>{course.courseName || "Untitled course"}</h3>
+              <span className="student-course-code">{course.courseCode || "Code not available"}</span>
+              <div className="student-course-meta"><div><span>Department</span><strong>{course.department || "Not available"}</strong></div><div><span>Year</span><strong>{course.year ?? "Not available"}</strong></div><div className="student-course-faculty"><span>Faculty</span><strong>{course.facultyName || course.faculty?.name || course.faculty || "Not assigned"}</strong></div></div>
+            </article>)}
+          </div> : <div className="student-empty-courses"><span aria-hidden="true">▤</span><strong>No courses found</strong><p>Your enrolled courses will appear here when available.</p></div>}
+        </section>
 
-          <div className="course-grid">
-
-            {dashboard.courses?.length > 0 ? (
-
-              dashboard.courses.map(
-                (course) => (
-
-                  <div
-                    className="course-card"
-                    key={course.id}
-                  >
-
-                    <h3>
-                      {course.courseName}
-                    </h3>
-
-                    <p>
-                      <strong>
-                        Code:
-                      </strong>{" "}
-                      {course.courseCode}
-                    </p>
-
-                    <p>
-                      <strong>
-                        Department:
-                      </strong>{" "}
-                      {course.department}
-                    </p>
-
-                    <p>
-                      <strong>
-                        Year:
-                      </strong>{" "}
-                      {course.year}
-                    </p>
-
-                    <p>
-                      <strong>
-                        Faculty:
-                      </strong>{" "}
-                      {course.facultyName}
-                    </p>
-
-                  </div>
-
-                )
-              )
-
-            ) : (
-
-              <div className="empty-course">
-                No courses assigned.
-              </div>
-
-            )}
-
-          </div>
-
-        </div>
-
+        <footer className="student-dashboard-footer">Smart Student Management System <span>•</span> Student workspace</footer>
       </main>
-
     </div>
   );
 }
