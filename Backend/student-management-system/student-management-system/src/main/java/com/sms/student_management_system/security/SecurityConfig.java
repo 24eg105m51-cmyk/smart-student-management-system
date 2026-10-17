@@ -13,6 +13,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
@@ -46,39 +47,28 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
-        CorsConfiguration configuration =
-                new CorsConfiguration();
+        CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(
-                List.of(
-                        "http://localhost:5173",
-                        "http://localhost:5174"
-                )
-        );
+        List<String> allowedOrigins = new ArrayList<>();
+        allowedOrigins.add("http://localhost:5173");
+        allowedOrigins.add("http://localhost:5174");
+
+        // Add your deployed frontend URL here after deploying the frontend.
+        // Example: allowedOrigins.add("https://your-frontend.up.railway.app");
+
+        configuration.setAllowedOrigins(allowedOrigins);
 
         configuration.setAllowedMethods(
-                List.of(
-                        "GET",
-                        "POST",
-                        "PUT",
-                        "DELETE",
-                        "OPTIONS"
-                )
+                List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
         );
 
-        configuration.setAllowedHeaders(
-                List.of("*")
-        );
-
+        configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
 
-        source.registerCorsConfiguration(
-                "/**",
-                configuration
-        );
+        source.registerCorsConfiguration("/**", configuration);
 
         return source;
     }
@@ -89,88 +79,58 @@ public class SecurityConfig {
 
         http
             .cors(cors ->
-                cors.configurationSource(
-                    corsConfigurationSource()
-                )
+                cors.configurationSource(corsConfigurationSource())
             )
-
-            .csrf(csrf ->
-                csrf.disable()
-            )
-
+            .csrf(csrf -> csrf.disable())
             .sessionManagement(session ->
-                session.sessionCreationPolicy(
-                    SessionCreationPolicy.STATELESS
-                )
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
-
-            .authenticationProvider(
-                authenticationProvider()
-            )
-
+            .authenticationProvider(authenticationProvider())
             .authorizeHttpRequests(auth -> auth
 
-                // Allow Spring Boot to render API error responses without converting them to 403
-                .requestMatchers("/error").permitAll()
+                // Public pages and error handling
+                .requestMatchers(
+                    "/",
+                    "/error",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/v3/api-docs/**"
+                ).permitAll()
 
-                // Authentication
+                // Public authentication endpoints
                 .requestMatchers(
                     "/api/auth/register",
                     "/api/auth/login"
                 ).permitAll()
 
-                // Admin
+                // Admin endpoints
                 .requestMatchers(
-                    "/api/admin/**"
-                ).hasRole("ADMIN")
-
-                .requestMatchers(
+                    "/api/admin/**",
                     "/api/dashboard/admin"
                 ).hasRole("ADMIN")
 
-                // Faculty
+                // Faculty endpoints
+                .requestMatchers("/api/faculty/**").authenticated()
+
+                // Course endpoints
+                .requestMatchers("/api/courses/**")
+                    .hasAnyRole("ADMIN", "FACULTY")
+
+                // Student endpoints
+                .requestMatchers("/api/students/**")
+                    .hasAnyRole("ADMIN", "STUDENT")
+
+                // Protected application endpoints
                 .requestMatchers(
-                    "/api/faculty/**"
+                    "/api/attendance/**",
+                    "/api/marks/**",
+                    "/api/enrollments/**",
+                    "/api/ai/**"
                 ).authenticated()
 
-                // Courses
-                .requestMatchers(
-                    "/api/courses/**"
-                ).hasAnyRole(
-                    "ADMIN",
-                    "FACULTY"
-                )
-
-                // Students
-                .requestMatchers(
-                    "/api/students/**"
-                ).hasAnyRole(
-                    "ADMIN",
-                    "STUDENT"
-                )
-
-                // Attendance
-                .requestMatchers(
-                    "/api/attendance/**"
-                ).authenticated()
-
-                // Marks
-                .requestMatchers(
-                    "/api/marks/**"
-                ).authenticated()
-
-                // Enrollments
-                .requestMatchers(
-                    "/api/enrollments/**"
-                ).authenticated()
-
-                // AI chat remains available only to authenticated users
-                .requestMatchers("/api/ai/**").authenticated()
-
-                // Everything else
+                // Keep all other endpoints protected
                 .anyRequest().authenticated()
             )
-
             .addFilterBefore(
                 jwtAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class
