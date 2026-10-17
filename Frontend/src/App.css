@@ -1,0 +1,4 @@
+/* Shared page polish. Detailed layouts live beside their corresponding pages. */
+.page-eyebrow { color: var(--primary); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.page-subtitle { color: var(--muted); margin-top: 6px; }
+.panel-surface { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
