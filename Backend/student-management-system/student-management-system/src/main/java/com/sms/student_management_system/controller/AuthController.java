@@ -1,3 +1,4 @@
+
 package com.sms.student_management_system.controller;
 
 import com.sms.student_management_system.dto.LoginRequest;
@@ -13,7 +14,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin
 public class AuthController {
 
     private final UserService userService;
