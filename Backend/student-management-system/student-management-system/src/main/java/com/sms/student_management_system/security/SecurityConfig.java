@@ -53,7 +53,8 @@ public class SecurityConfig {
                 // Admin-only endpoints
                 .requestMatchers(
                     "/api/admin/**",
-                    "/api/dashboard/admin"
+                    "/api/dashboard/admin",
+                    "/api/students/**"
                 ).hasRole("ADMIN")
 
                 // Faculty endpoints
@@ -64,11 +65,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/courses/**")
                     .hasAnyRole("ADMIN", "FACULTY")
 
-                // Students: admin and students
-                .requestMatchers("/api/students/**")
-                    .hasAnyRole("ADMIN", "STUDENT")
-
-                // Authenticated endpoints
+                // Other authenticated endpoints
                 .requestMatchers(
                     "/api/attendance/**",
                     "/api/marks/**",
