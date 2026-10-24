@@ -29,7 +29,9 @@ public class AiService {
 
         this.objectMapper = objectMapper;
         this.apiKey = apiKey == null ? "" : apiKey.trim();
-        this.model = model == null ? "gemini-2.5-flash" : model.trim();
+        this.model = model == null || model.isBlank()
+                ? "gemini-2.5-flash"
+                : model.trim();
 
         this.restClient = RestClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com")
@@ -41,13 +43,12 @@ public class AiService {
         if (apiKey.isBlank()) {
             throw new ResponseStatusException(
                     HttpStatus.SERVICE_UNAVAILABLE,
-                    "Gemini API key is missing. Set GEMINI_API_KEY and restart the backend.");
+                    "Gemini API key is missing. Configure GEMINI_API_KEY.");
         }
 
         if (message == null || message.isBlank()) {
             throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Message cannot be empty.");
+                    HttpStatus.BAD_REQUEST, "Message cannot be empty.");
         }
 
         if (message.length() > 4000) {
@@ -58,25 +59,21 @@ public class AiService {
 
         Map<String, Object> payload = Map.of(
                 "systemInstruction", Map.of(
-                        "parts", List.of(
-                                Map.of(
-                                        "text",
-                                        "You are a helpful AI assistant inside a Student Management System. "
-                                                + "Help with attendance, marks, courses, study planning, "
-                                                + "student management, and educational questions. "
-                                                + "Give clear, accurate, and concise answers. "
-                                                + "Do not claim to access private student records or modify "
-                                                + "the database because no database tools are connected. "
-                                                + "Never request passwords, API keys, or sensitive information."
-                                )
-                        )
+                        "parts", List.of(Map.of(
+                                "text",
+                                "You are a helpful AI assistant inside a Student Management System. "
+                                + "Help with attendance, marks, courses, study planning, "
+                                + "student management, and educational questions. "
+                                + "Give clear, accurate, concise answers. "
+                                + "Do not claim to access private student records or modify "
+                                + "the database because no database tools are connected. "
+                                + "Never request passwords, API keys, or sensitive information."
+                        ))
                 ),
                 "contents", List.of(
                         Map.of(
                                 "role", "user",
-                                "parts", List.of(
-                                        Map.of("text", message)
-                                )
+                                "parts", List.of(Map.of("text", message))
                         )
                 ),
                 "generationConfig", Map.of(
@@ -107,8 +104,7 @@ public class AiService {
 
             if (reply.isBlank()) {
                 String blockReason = response.path("promptFeedback")
-                        .path("blockReason")
-                        .asText("");
+                        .path("blockReason").asText("");
 
                 if (!blockReason.isBlank()) {
                     throw new ResponseStatusException(
@@ -122,58 +118,60 @@ public class AiService {
             }
 
             System.out.println("Gemini response received successfully.");
-
             return reply;
 
         } catch (RestClientResponseException exception) {
 
-            int providerStatus = exception.getStatusCode().value();
+            int status = exception.getStatusCode().value();
 
             System.err.println("========== GEMINI API ERROR ==========");
-            System.err.println("Gemini HTTP status: " + providerStatus);
-
-            // Avoid printing raw provider responses or API keys.
+            System.err.println("Gemini HTTP status: " + status);
             System.err.println("Gemini model: " + model);
+
+            // Log provider error details for diagnosis.
+            // Do not log the API key or request headers.
+            String providerBody = exception.getResponseBodyAsString();
+            if (providerBody != null && !providerBody.isBlank()) {
+                System.err.println("Gemini provider error: " + providerBody);
+            }
+
             System.err.println("======================================");
 
-            if (providerStatus == 429) {
-                throw new ResponseStatusException(
-                        HttpStatus.TOO_MANY_REQUESTS,
-                        "Gemini quota or rate limit reached. Check Google AI Studio.");
-            }
-
-            if (providerStatus == 400) {
+            if (status == 429) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_GATEWAY,
-                        "Gemini rejected the request (HTTP 400). Check the model and request format.");
+                        "Gemini quota or rate limit reached. Check your API quota.");
             }
 
-            if (providerStatus == 401 || providerStatus == 403) {
+            if (status == 401 || status == 403) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_GATEWAY,
-                        "Gemini authentication or project access failed (HTTP "
-                                + providerStatus + ").");
+                        "Gemini authentication or access failed (HTTP "
+                                + status + ").");
             }
 
-            if (providerStatus == 404) {
+            if (status == 404) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_GATEWAY,
-                        "Gemini model not found (HTTP 404). Check the model name.");
+                        "Gemini model or API endpoint not found. Check backend logs.");
+            }
+
+            if (status == 400) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Gemini rejected the request (HTTP 400). Check backend logs.");
             }
 
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
-                    "Gemini API failed with HTTP status " + providerStatus + ".");
+                    "Gemini API failed with HTTP status " + status + ".");
 
         } catch (ResponseStatusException exception) {
             throw exception;
 
         } catch (Exception exception) {
-
-            System.err.println("========== GEMINI CONNECTION ERROR ==========");
-            System.err.println("Exception type: "
+            System.err.println("Gemini connection/processing error type: "
                     + exception.getClass().getSimpleName());
-            System.err.println("=============================================");
 
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
@@ -184,7 +182,6 @@ public class AiService {
     private String extractText(JsonNode response) {
 
         JsonNode candidates = response.path("candidates");
-
         if (!candidates.isArray()) {
             return "";
         }
@@ -192,7 +189,6 @@ public class AiService {
         StringBuilder result = new StringBuilder();
 
         for (JsonNode candidate : candidates) {
-
             JsonNode parts = candidate.path("content").path("parts");
 
             if (!parts.isArray()) {
@@ -200,15 +196,12 @@ public class AiService {
             }
 
             for (JsonNode part : parts) {
-
                 String value = part.path("text").asText("");
 
                 if (!value.isBlank()) {
-
                     if (!result.isEmpty()) {
                         result.append("\n");
                     }
-
                     result.append(value);
                 }
             }
