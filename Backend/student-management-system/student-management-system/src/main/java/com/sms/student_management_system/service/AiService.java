@@ -25,12 +25,12 @@ public class AiService {
     public AiService(
             ObjectMapper objectMapper,
             @Value("${gemini.api-key:}") String apiKey,
-            @Value("${gemini.model:gemini-2.5-flash}") String model) {
+            @Value("${gemini.model:gemini-3.8-flash}") String model) {
 
         this.objectMapper = objectMapper;
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.model = model == null || model.isBlank()
-                ? "gemini-2.5-flash"
+                ? "gemini-3.8-flash"
                 : model.trim();
 
         this.restClient = RestClient.builder()
@@ -77,7 +77,6 @@ public class AiService {
                         )
                 ),
                 "generationConfig", Map.of(
-                        "temperature", 0.7,
                         "maxOutputTokens", 700
                 )
         );
@@ -128,8 +127,6 @@ public class AiService {
             System.err.println("Gemini HTTP status: " + status);
             System.err.println("Gemini model: " + model);
 
-            // Log provider error details for diagnosis.
-            // Do not log the API key or request headers.
             String providerBody = exception.getResponseBodyAsString();
             if (providerBody != null && !providerBody.isBlank()) {
                 System.err.println("Gemini provider error: " + providerBody);
